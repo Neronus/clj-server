@@ -1,3 +1,6 @@
+Time-stamp: <2009-04-01 14:10:35 christian>
+Christian von Essen <christian@mvonessen.de>
+
 This project aims to provide a client-server architecture for clojure.
 
 Clojure's startup time is pretty bad. Too bad, in fact, to use it as a platform
