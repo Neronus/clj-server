@@ -1,4 +1,4 @@
-Time-stamp: <2009-04-01 14:10:35 christian>
+Time-stamp: <2009-04-01 15:31:11 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -53,7 +53,11 @@ NOTES:
 * Using vars is not a good idea, as they are persistend between sessions,
   and are possibly set by another script.
 * Using System/exit is an even worse idea, as this kills the server.
-  If you want to end your script, use (.stop (Thread/currentThread)).
+  If you want to end your script, use something like
+    (let [thread (Thread/currentThread)]
+      (locking thread
+        (.interrupt thread)
+        (.wait thread)))
   This is caught by the server, and your session terminates.
 * The system property user.dir is set to the working directory of the
   client. If you rely on the current directory anywhere, ask for that
