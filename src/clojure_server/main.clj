@@ -64,13 +64,17 @@ prepend user.dir to it, and return the result"
     (println "Clojure"))
   (repl :init #(initialize args inits)
 		 :caught (fn [e]
-		 		   (if (or (instance? java.lang.ThreadDeath e) (and (instance? Compiler$CompilerException e) (instance? ThreadDeath (.getCause e))))
+		 		   (if (or (instance? java.lang.InterruptedException e) (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e))))
 		 			 (throw e)
 		 			 (binding [*out* *err*]
 		 			   (if (instance? Compiler$CompilerException e)
-						 (.println *err* (clojure.contrib.stacktrace/root-cause (clojure.contrib.stacktrace/root-cause e))))))))
+						 (.println *err* (clojure.contrib.stacktrace/root-cause e))
+						 (.println *err* e))))))
   (prn)
-  (exit 0))
+  (locking repl-opt
+	(.interrupt (Thread/currentThread))
+	(.wait repl-opt)))
+
 
 (defn- script-opt
   "Run a script from a file, resource, or standard in with args and inits"
@@ -143,8 +147,11 @@ prepend user.dir to it, and return the result"
          ((main-dispatch opt) args inits)))
      (repl-opt nil nil))
    (catch Exception e
-	 (when (not (and (instance? Compiler$CompilerException e) (instance? ThreadDeath (.getCause e))))
+	 (when (not (or
+				 (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e)))
+				 (instance? InterruptedException e)))
 	   (binding [*out* *err*]
 		 (clojure.contrib.stacktrace/print-stack-trace
 		  (clojure.contrib.stacktrace/root-cause e))))))
+  (trace "DONE")
   (flush))

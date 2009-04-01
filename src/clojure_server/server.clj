@@ -102,6 +102,7 @@ otherwise"
 		   ;; This binding is not used, as clojure's core doesn't provide an exit function
 		   ;; by default
 		   ;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
+		   (clojure.contrib.trace/trace 'recieved)
 			 (apply clojure-server.main/server-main args)))))
 
 (defn start-server [port]
@@ -109,10 +110,10 @@ otherwise"
 						(with-open
 							[in (clojure.lang.LineNumberingPushbackReader. (java.io.InputStreamReader. in))
 							 out (java.io.PrintWriter. out)]
-						  (reciever in out)))
-				 10
-				 (java.net.InetAddress/getByAddress
-				  (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)]))))
+						  (reciever in out)))))
+;				 10
+;				 (java.net.InetAddress/getByAddress
+;				  (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)]))))
 
 (defn stop-server [server]
   (close-server server))
