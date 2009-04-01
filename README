@@ -1,0 +1,58 @@
+This project aims to provide a client-server architecture for clojure.
+
+Clojure's startup time is pretty bad. Too bad, in fact, to use it as a platform
+for scripting. So this project aims to provide a client-server architecture
+compatible to normal usage of clojure. This means, that if you start the client
+without parameters, the normal clojure REPL is started, and if you pass a file
+name, that script is executed, and so forth. In fact, I copied clojure.main
+and modified it to reflect my needs.
+
+To achieve this, a server is listening for incoming connections on a configurable
+port. If a client connects, the connection is used to transfer data that normally
+goes through *in* *out* and *err*.
+
+This server is intended for local use only. This means, that you should
+only listen to 127.0.0.1 or some other loopback address, as the data stream
+is not encrypted. Furthermore, the authentication scheme only works locally.
+
+PROTOCOL:
+* Authentication:
+As the server executes arbitrary code, some kind of authentication has to be
+used. This authentication has to work without user interaction, has to be fast
+and easy to setup, and should require no third party libraries, if possible.
+
+This project uses a file based authentication method: A file, which can only
+be read by the user who started the server is required. The client
+is required to send the filename of the file he wishes to use for authentication,
+the server looks if the file is acceptable (i.e. only readable for the user
+who started the server), accepts the file if it is. The client then starts
+to transmit the contents of the file, and the server compares the recieved
+data with the contents of the file. If the recieved data and the file's contents
+are equal, the connection is accepted, and the command line parameter passing
+is started.
+
+* Command line parameter passing:
+First, the current working directory is transmitted, then the number of
+command line arguments, then the command line arguments themself, if
+there are any.
+
+USAGE:
+On the server side, you have to start a clojure instance,
+and start a server via '(clojure-server.start-server <port>).
+On the client side, you have to use the clj-client binary.
+To configure this binary, there is one environment variable:
+CLJ_CLIENT_PORT the port to connect to.
+The file to use for authentication is looked for in
+$HOME/.clj-server-auth. Other than that, the client should work
+just like using clojure.main in most cases.
+
+NOTES:
+* Using vars is not a good idea, as they are persistend between sessions,
+  and are possibly set by another script.
+* Using System/exit is an even worse idea, as this kills the server.
+  If you want to end your script, use (.stop (Thread/currentThread)).
+  This is caught by the server, and your session terminates.
+* The system property user.dir is set to the working directory of the
+  client. If you rely on the current directory anywhere, ask for that
+  property. The REAL current directory of the program executing your
+  code will be that of the server
