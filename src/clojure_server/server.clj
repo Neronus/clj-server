@@ -102,8 +102,7 @@ otherwise"
 		   ;; This binding is not used, as clojure's core doesn't provide an exit function
 		   ;; by default
 		   ;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
-		   (clojure.contrib.trace/trace 'recieved)
-			 (apply clojure-server.main/server-main args)))))
+		   (apply clojure-server.main/server-main args)))))
 
 (defn start-server [port]
   (create-server port (fn [in out]

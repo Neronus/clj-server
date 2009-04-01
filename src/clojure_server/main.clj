@@ -153,5 +153,4 @@ prepend user.dir to it, and return the result"
 	   (binding [*out* *err*]
 		 (clojure.contrib.stacktrace/print-stack-trace
 		  (clojure.contrib.stacktrace/root-cause e))))))
-  (trace "DONE")
   (flush))
