@@ -1,4 +1,4 @@
-Time-stamp: <2009-04-01 15:31:11 christian>
+Time-stamp: <2009-04-02 18:46:53 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -17,6 +17,13 @@ goes through *in* *out* and *err*.
 This server is intended for local use only. This means, that you should
 only listen to 127.0.0.1 or some other loopback address, as the data stream
 is not encrypted. Furthermore, the authentication scheme only works locally.
+
+REQUIREMENTS:
+To check the file permissions, a POSIX library is required. The one
+used can be found at
+http://www.bmsi.com/java/posix/package.html.
+Alternatively, there is a slightly modified version at
+http://github.com/Neronus/clj-server/tree/master
 
 PROTOCOL:
 * Authentication:

@@ -1,0 +1,17 @@
+The posix library is dedicated to implementing posix functionality which
+is dependent on C calls via native code or specific file formats.
+
+Additional functionality proposed:
+
+Group class	similar to Passwd.
+
+Unix domain sockets.  Difficult to integrate with java.net for Datagrams.
+May have to duplicate java.net functionality.  Will be easier for Java 2.
+
+Attaching a Socket to an open file descriptor.  Some unix APIs pass 
+sockets to a process via open file descriptors - e.g. inetd and AIX SRC.
+Can this be done portably?
+
+Functionality best implemented elsewhere:
+
+Syslog	implemented via Pure Java in other packages.
