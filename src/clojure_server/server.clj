@@ -10,7 +10,8 @@
   (:refer-clojure)
   (:use clojure.contrib.server-socket
 		clojure.contrib.shell-out
-		clojure-server.main))
+		clojure-server.main)
+  (:import (posix File)))
 
 (defn- lazy-slurp
   "Read lazyly from anything supporting a .read method (e.g. Streams),
@@ -63,11 +64,16 @@ otherwise"
 (defn- is-relative? [path]
   (not (= (first path) \/)))
 
-(defn- file-mask [path]
-  (let [stat (sh "/usr/bin/stat" "-L" "-c" "%A" path :return-map true)]
-	(if (not (= (stat :exit) 0))
-	  (throw (java.lang.RuntimeException. (stat :err)))
-	  (re-seq #"[r-][w-][x-]" (.substring (stat :out) 1)))))
+(defn- check-modflags
+  "Returns false iff anyone but the user can do anything with the file.
+Otherwise true is returned"
+  [path]
+  (let [f (File. path)
+		mode (-> f .getStat .mode)]
+	(=
+	 ;; only the lowest 6 bits are interesting, and they shouldn't be set
+	 (bit-and 0077 mode)
+	 0)))
 
 (defn auth [in out]
   (letfn ((dont-accept [] (.write out (int 0)) (.flush out) false)
@@ -79,14 +85,13 @@ otherwise"
 	  (if (is-relative? path)
 		(dont-accept)
 		(try
-		 (let [mask (file-mask path)]
-		   (if (not (and (re-find #"r" (nth mask 0)) (= "---" (nth mask 1)) (= "---" (nth mask 2))))
-			 (dont-accept)
-			 (do
-			   (accept)
-			   (if (not (check-path path))
-				 (dont-accept)
-				 (accept)))))
+		 (if-not (check-modflags path)
+		   (dont-accept)
+		   (do
+			 (accept)
+			 (if (not (check-path path))
+			   (dont-accept)
+			   (accept))))
 		 (catch Exception e (dont-accept)))))))
 
 
