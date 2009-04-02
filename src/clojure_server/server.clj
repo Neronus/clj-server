@@ -47,20 +47,6 @@ otherwise"
   (let [properties (System/getProperties)]
 	(.setProperty properties (str key) (str value))))
 
-
-
-(defn- get-property [key]
-  (let [properties (System/getProperties)]
-	(.getProperty properties (str key))))
-
-(defn- get-property-names []
-  (let [properties (System/getProperties)]
-	(let [nameEnum (.propertyNames properties)]
-	  (letfn [(iter [] 
-					(if (.hasMoreElements nameEnum)
-					  (lazy-seq (cons (.nextElement nameEnum) (iter)))))]
-		(iter)))))
-
 (defn- is-relative? [path]
   (not (= (first path) \/)))
 
