@@ -8,10 +8,10 @@
 
 (ns clojure-server.server
   (:refer-clojure)
-  (:use clojure.contrib.server-socket
-		clojure.contrib.shell-out
-		clojure-server.main)
-  (:import (posix File)))
+  (:use	clojure-server.main clojure.contrib.trace)
+  (:import (posix File)
+		   (java.net ServerSocket InetAddress)
+		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue)))
 
 (defn- lazy-slurp
   "Read lazyly from anything supporting a .read method (e.g. Streams),
@@ -95,15 +95,23 @@ Otherwise true is returned"
 		   ;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
 		   (apply clojure-server.main/server-main args)))))
 
-(defn start-server [port]
-  (create-server port (fn [in out]
-						(with-open
-							[in (clojure.lang.LineNumberingPushbackReader. (java.io.InputStreamReader. in))
-							 out (java.io.PrintWriter. out)]
-						  (reciever in out)))))
-;				 10
-;				 (java.net.InetAddress/getByAddress
-;				  (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)]))))
+(defstruct server :socket :connections)
 
-(defn stop-server [server]
-  (close-server server))
+(defn create-server [port backlog]
+  (let [socket (ServerSocket. port backlog
+							  (InetAddress/getByAddress (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)])))]
+	socket))
+
+
+(defn server-loop [socket minThreads maxThreads]
+  "accepts connections on the socket, and launches the repl on incoming
+connections. Doesn't return."
+  (let [exec (ThreadPoolExecutor. minThreads maxThreads 5 TimeUnit/MINUTES
+								  (LinkedBlockingQueue.))]
+	(loop []
+		(let [csocket (.accept socket)]
+		  (.submit exec #^Callable #(with-open [csocket csocket]
+									  (reciever (clojure.lang.LineNumberingPushbackReader.
+												 (java.io.InputStreamReader. (.getInputStream csocket)))
+												(java.io.PrintWriter. (.getOutputStream csocket))))))
+	  (recur))))
