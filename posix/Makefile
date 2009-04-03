@@ -14,10 +14,15 @@ CVSTAG=posix-1_1_8
 #JAVALIB = /usr/jdk_base/lib/aix/native_threads/libposix.a
 
 # RHEL 4
-CXXFLAGS = -O -pthread -I/java/include -I/java/include/linux \
-	-DHAS_SEM_POST -DHAVE_MSGBUF -Dsigthreadmask=pthread_sigmask
-LIB =	-pthread -L/opt/java/jre/lib/i386/ -ljava
-JAVALIB = /opt/java/jre/lib/i386/libposix.so
+
+
+#ARCH=i386
+ARCH=amd64
+JAVATOP=/opt/java/
+
+CXXFLAGS = -O -pthread -I$(JAVATOP)/include -I$(JAVATOP)/include/linux \
+	-DHAS_SEM_POST -DHAVE_MSGBUF -Dsigthreadmask=pthread_sigmask -fPIC
+LIB =	-pthread -L$(JAVATOP)/jre/lib/$(ARCH)/ -ljava
 
 # Solaris 2.6
 #CCFLAGS = -O -I/usr/java/include -I/usr/java/include/solaris -DSIGMAX=MAXSIG
@@ -51,9 +56,6 @@ libposix.so: $(POSIX_OBJS)
 #	ld -s -o posix.so ipc.o Errno.o CPtr.o Signal.o	\
 #	  -bnoentry -bM:SRE -bE:posix.exp -blibpath:/lib:/usr/lib \
 #	  -lpthreads -lc_r -L/java/lib/aix/native_threads -ljava
-
-install:	posix.so
-	su root -c "cp posix.so $(JAVALIB)"
 
 tar:
 	ln -s . $(PKG) || true
