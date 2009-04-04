@@ -1,4 +1,4 @@
-Time-stamp: <2009-04-03 15:48:07 christian>
+Time-stamp: <2009-04-04 14:34:35 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -46,6 +46,19 @@ First, the current working directory is transmitted, then the number of
 command line arguments, then the command line arguments themself, if
 there are any.
 
+* Communication:
+Communication is done via sockets, obviously. The client
+just send its data to the server. The server OTOH uses
+a simple protocol to address filedescriptors when printing:
+  Everything that is sent from the server to the client
+  is wrapped into a 'chunk' (idea taken from Nailgun).
+  This chunk has a header consisting of 2 integers (4 byte each):
+  First, the number of the filedescriptor to be addressed is sent,
+  then the size of the chunk. After that, the contents of the
+  chunk are sent. The client recieves the chunk, and forwards
+  the data to the given FD. At the time of writing, only
+  two FDs are supported on the server side: stdout and stederr.
+
 USAGE:
 On the server side, you have to start a clojure instance,
 create a server socket via (create-server <port> <backlog>),
@@ -58,7 +71,9 @@ To configure this binary, there is one environment variable:
 CLJ_CLIENT_PORT the port to connect to.
 The file to use for authentication is looked for in
 $HOME/.clj-server-auth. Other than that, the client should work
-just like using clojure.main in most cases.
+just like using clojure.main in all cases.
+Each session gets a unique namespace, exclsuively created for it.
+After the session terminates, the namespace is deleted.
 
 NOTES:
 * Using vars is not a good idea, as they are persistend between sessions,
