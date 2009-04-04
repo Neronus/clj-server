@@ -29,6 +29,7 @@ otherwise"
 		 (this)))
 
 (defn read-to-null [reader]
+  "read to the next null byte from the reader."
   (loop [result []]
 	(let [c (.read reader)]
 	  (cond
