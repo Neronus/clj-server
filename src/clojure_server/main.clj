@@ -65,11 +65,12 @@ prepend user.dir to it, and return the result"
   (repl :init #(initialize args inits)
 		 :caught (fn [e]
 		 		   (if (or (instance? java.lang.InterruptedException e) (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e))))
-		 			 (throw e)
-		 			 (binding [*out* *err*]
-		 			   (if (instance? Compiler$CompilerException e)
+					 (throw e)
+					 (do
+					   (if (instance? Compiler$CompilerException e)
 						 (.println *err* (clojure.contrib.stacktrace/root-cause e))
-						 (.println *err* e))))))
+						 (.println *err* e))
+					   (.flush *err*)))))
   (prn)
   (locking repl-opt
 	(.interrupt (Thread/currentThread))
@@ -152,5 +153,6 @@ prepend user.dir to it, and return the result"
 				 (instance? InterruptedException e)))
 	   (binding [*out* *err*]
 		 (clojure.contrib.stacktrace/print-stack-trace
-		  (clojure.contrib.stacktrace/root-cause e))))))
+		  (clojure.contrib.stacktrace/root-cause e))
+		 (flush)))))
   (flush))

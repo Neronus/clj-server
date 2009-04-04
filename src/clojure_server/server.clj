@@ -10,6 +10,8 @@
   (:refer-clojure)
   (:use	clojure-server.main clojure.contrib.trace)
   (:import (posix File)
+		   (clojure_server ChunkOutputStream)
+		   (java.io InputStreamReader OutputStreamWriter)
 		   (java.net ServerSocket InetAddress)
 		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue)))
 
@@ -82,18 +84,19 @@ Otherwise true is returned"
 
 
 (defn- reciever [input output]
-  (and (auth input output)
-	   (let [pwd (read-to-null input)
-			 n-args (Integer/parseInt (read-to-null input))
-			 args (seq (read-command-line-parms input n-args))]
-		 (binding [*in* input
-				   *out* output
-				   *err* output]
-		   (set-property! "user.dir" pwd)
-		   ;; This binding is not used, as clojure's core doesn't provide an exit function
-		   ;; by default
-		   ;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
-		   (apply clojure-server.main/server-main args)))))
+  (when (auth input output)
+	(let [pwd (read-to-null input)
+		  n-args (Integer/parseInt (read-to-null input))
+		  args (seq (read-command-line-parms input n-args))]
+	  (binding [*in* (clojure.lang.LineNumberingPushbackReader.
+					  (InputStreamReader. input))
+				*out* (OutputStreamWriter. (ChunkOutputStream. output 1))
+				*err* (OutputStreamWriter. (ChunkOutputStream. output 2))]
+		(set-property! "user.dir" pwd)
+		;; This binding is not used, as clojure's core doesn't provide an exit function
+		;; by default
+		;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
+		(apply clojure-server.main/server-main args)))))
 
 (defstruct server :socket :connections)
 
@@ -111,7 +114,5 @@ connections. Doesn't return."
 	(loop []
 		(let [csocket (.accept socket)]
 		  (.submit exec #^Callable #(with-open [csocket csocket]
-									  (reciever (clojure.lang.LineNumberingPushbackReader.
-												 (java.io.InputStreamReader. (.getInputStream csocket)))
-												(java.io.PrintWriter. (.getOutputStream csocket))))))
-	  (recur))))
+									  (reciever (.getInputStream csocket) (.getOutputStream csocket)))))
+		(recur))))

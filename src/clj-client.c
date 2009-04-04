@@ -53,6 +53,20 @@ int send_int(int socket, int i) {
   return send(socket, buf, n+1, 0);
 }
 
+int recv_int(int socket, int *result) {
+  unsigned char buf[4];
+  int ret, i = 0;
+  while(i < 4) {
+	ret = recv(socket, buf + i, 4 - i, 0);
+	if(ret <= 0) {
+	  return ret;
+	}
+	i += ret;
+  }
+  *result = buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+  return i;
+}
+
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
 {
@@ -163,8 +177,9 @@ void stdin_reader(int socket) {
 	send(socket, buf, numbytes, 0);
   }
 }
-  
 
+
+  
 /*
  * Only called, when socket is ready to read.
  * Reads from socket, and write output to stdout.
@@ -173,24 +188,43 @@ void stdin_reader(int socket) {
 void stdout_writer(int socket) {
   char buf[MAXDATASIZE];
   int numbytes;
-  
-  numbytes = recv(socket, buf, MAXDATASIZE-1, 0);
-  switch(numbytes) {
-  case -1:
+  int length = 0;
+  int fd = 0;
+  int done = 0;
+
+  numbytes = recv_int(socket, &fd);
+  if(numbytes < 0) {
 	perror("recv");
 	exit(1);
-  case 0:
+  } else if (numbytes == 0) {
 	sock_done = 1;
-	shutdown(socket, SHUT_RD);
-	break;
-  default:
-	buf[numbytes] = '\0';
-	fputs(buf, stdout);
-	fflush(stdout);
+	return;
+  }
+  numbytes = recv_int(socket, &length);
+  if(numbytes != 4) {
+	perror("recv");
+	exit(1);
   }
 
+  while(length > 0 && !done) {
+	numbytes = recv(socket, buf, length > MAXDATASIZE? MAXDATASIZE : length, 0);
+	switch(numbytes) {
+	case -1:
+	  perror("recv");
+	  exit(1);
+	case 0:
+	  sock_done = 1;
+	  done = 1;
+	  shutdown(socket, SHUT_RD);
+	  break;
+	default:
+	  write(fd, buf, numbytes);
+	  //fputs(buf, stdout);
+	  length -= numbytes;
+	}
+  }
+  fflush(NULL);
 }
-
 
 int main(int argc, char *argv[])
 {
