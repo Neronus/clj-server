@@ -50,8 +50,9 @@ prepend user.dir to it, and return the result"
 
 (defn- initialize
   "Common initialize routine for repl, script, and null opts"
-  [args inits]
-  (in-ns 'user)
+  [ns-name args inits]
+  (eval `(ns ~ns-name))
+  (in-ns ns-name)
   (set! *command-line-args* args)
   (doseq [[opt arg] inits]
     ((init-dispatch opt) arg)))
@@ -59,18 +60,18 @@ prepend user.dir to it, and return the result"
 (defn- repl-opt
   "Start a repl with args and inits. Print greeting if no eval options were
   present"
-  [[_ & args] inits]
+  [ns-name [_ & args] inits]
   (when-not (some #(= eval-opt (init-dispatch (first %))) inits)
     (println "Clojure"))
-  (repl :init #(initialize args inits)
-		 :caught (fn [e]
-		 		   (if (or (instance? java.lang.InterruptedException e) (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e))))
-					 (throw e)
-					 (do
-					   (if (instance? Compiler$CompilerException e)
-						 (.println *err* (clojure.contrib.stacktrace/root-cause e))
-						 (.println *err* e))
-					   (.flush *err*)))))
+  (repl :init #(initialize ns-name args inits)
+		:caught (fn [e]
+				  (if (or (instance? java.lang.InterruptedException e) (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e))))
+					(throw e)
+					(do
+					  (if (instance? Compiler$CompilerException e)
+						(.println *err* (clojure.contrib.stacktrace/root-cause e))
+						(.println *err* e))
+					  (.flush *err*)))))
   (prn)
   (locking repl-opt
 	(.interrupt (Thread/currentThread))
@@ -79,22 +80,22 @@ prepend user.dir to it, and return the result"
 
 (defn- script-opt
   "Run a script from a file, resource, or standard in with args and inits"
-  [[path & args] inits]
+  [ns-name [path & args] inits]
   (with-bindings
-    (initialize args inits)
+    (initialize ns-name args inits)
     (if (= path "-")
       (load-reader *in*)
       (load-script (make-absolute path)))))
 
 (defn- null-opt
   "No repl or script opt present, just bind args and run inits"
-  [args inits]
+  [ns-name args inits]
   (with-bindings
-    (initialize args inits)))
+    (initialize ns-name args inits)))
 
 (defn- help-opt
   "Print help text for main"
-  [_ _]
+  [_ _ _]
   (println (:doc (meta (var main)))))
 
 (defn- main-dispatch
@@ -140,19 +141,21 @@ prepend user.dir to it, and return the result"
   Paths may be absolute or relative in the filesystem or relative to
   classpath. Classpath-relative paths have prefix of @ or @/"
   [& args]
-  (try
-   (if args
-     (loop [[opt arg & more :as args] args inits []]
-       (if (init-dispatch opt)
-         (recur more (conj inits [opt arg]))
-         ((main-dispatch opt) args inits)))
-     (repl-opt nil nil))
-   (catch Exception e
-	 (when (not (or
-				 (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e)))
-				 (instance? InterruptedException e)))
-	   (binding [*out* *err*]
-		 (clojure.contrib.stacktrace/print-stack-trace
-		  (clojure.contrib.stacktrace/root-cause e))
-		 (flush)))))
-  (flush))
+  (let [ns-name (gensym "user")]
+	(try
+	 (if args
+	   (loop [[opt arg & more :as args] args inits []]
+		 (if (init-dispatch opt)
+		   (recur more (conj inits [opt arg]))
+		   ((main-dispatch opt) ns-name args inits)))
+	   (repl-opt ns-name nil nil))
+	 (catch Exception e
+	   (when (not (or
+				   (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e)))
+				   (instance? InterruptedException e)))
+		 (binding [*out* *err*]
+		   (clojure.contrib.stacktrace/print-stack-trace
+			(clojure.contrib.stacktrace/root-cause e))
+		   (flush))))
+	 (finally (clojure.lang.Namespace/remove ns-name)))
+	(flush)))
