@@ -1,0 +1,8 @@
+#!/home/christian/bin/clojure
+
+; Starts a clojure server listening in port 9000
+
+(use 'clojure-server.server)
+
+(def *ss* (create-server 9000 10))
+(server-loop *ss* 2 5)
