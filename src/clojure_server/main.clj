@@ -160,5 +160,5 @@ prepend user.dir to it, and return the result"
 		   (clojure.contrib.stacktrace/print-stack-trace
 			(clojure.contrib.stacktrace/root-cause e))
 		   (flush))))
-	 (finally (clojure.lang.Namespace/remove ns-name)))
+	 (finally (if *gensym-ns* (clojure.lang.Namespace/remove ns-name))))
 	(flush)))
