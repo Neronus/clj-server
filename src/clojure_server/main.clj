@@ -16,7 +16,7 @@
   (:use clojure.main clojure.contrib.trace)
   (:require clojure.contrib.stacktrace))
 
-(def *gensym-repl* true)
+(def *gensym-ns* true)
 
 (defn- make-absolute
   "If the path is absolute, return it as it is. Otherwise,
@@ -144,7 +144,7 @@ prepend user.dir to it, and return the result"
   Paths may be absolute or relative in the filesystem or relative to
   classpath. Classpath-relative paths have prefix of @ or @/"
   [& args]
-  (let [ns-name (if *gensym-repl* (gensym "user") 'user)]
+  (let [ns-name (if *gensym-ns* (gensym "user") 'user)]
 	(try
 	 (if args
 	   (loop [[opt arg & more :as args] args inits []]

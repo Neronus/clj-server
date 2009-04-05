@@ -133,8 +133,8 @@ connections. Doesn't return."
 								  (LinkedBlockingQueue.))]
 	(loop []
 		(let [csocket (.accept socket)
-			  gensym-repl *gensym-repl*]
+			  gensym-ns *gensym-ns*]
 		  (.submit exec #^Callable #(with-open [csocket csocket]
-									  (binding [*gensym-repl* gensym-repl]
+									  (binding [*gensym-ns* gensym-ns]
 										(reciever (.getInputStream csocket) (.getOutputStream csocket))))))
 		(recur))))
