@@ -1,5 +1,6 @@
-PKG=posix-1.1.8
-CVSTAG=posix-1_1_8
+#ARCH=i386
+ARCH=amd64
+JAVATOP=/opt/java/
 
 # preprocessor flags:
 # POSIX_STRERROR_R=0	old glibc strerror_r
@@ -15,11 +16,6 @@ CVSTAG=posix-1_1_8
 
 # RHEL 4
 
-
-#ARCH=i386
-ARCH=amd64
-JAVATOP=/opt/java/
-
 CXXFLAGS = -O -pthread -I$(JAVATOP)/include -I$(JAVATOP)/include/linux \
 	-DHAS_SEM_POST -DHAVE_MSGBUF -Dsigthreadmask=pthread_sigmask -fPIC
 LIB =	-pthread -L$(JAVATOP)/jre/lib/$(ARCH)/ -ljava
@@ -31,7 +27,6 @@ LIB =	-pthread -L$(JAVATOP)/jre/lib/$(ARCH)/ -ljava
 #CCC = gcc
 
 JAVA_CLASSES=$(wildcard posix/*.java)
-JUNIT_LIB=/usr/lib/junit.jar
 
 all:	libposix.so posix.jar
 
@@ -78,7 +73,7 @@ posix.jar: classes
 	jar c posix/*.class > posix.jar
 
 classes:
-	CLASSPATH=posix:"$(JUNIT_LIB)" javac -g posix/*.java
+	CLASSPATH=posix javac -g posix/*.java
 
 zip:
 	zip posix posix/*.java *.h *.cc *.html Makefile
