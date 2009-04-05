@@ -132,7 +132,9 @@ connections. Doesn't return."
   (let [exec (ThreadPoolExecutor. minThreads maxThreads 5 TimeUnit/MINUTES
 								  (LinkedBlockingQueue.))]
 	(loop []
-		(let [csocket (.accept socket)]
+		(let [csocket (.accept socket)
+			  gensym-repl *gensym-repl*]
 		  (.submit exec #^Callable #(with-open [csocket csocket]
-									  (reciever (.getInputStream csocket) (.getOutputStream csocket)))))
+									  (binding [*gensym-repl* gensym-repl]
+										(reciever (.getInputStream csocket) (.getOutputStream csocket))))))
 		(recur))))
