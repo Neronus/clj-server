@@ -70,10 +70,11 @@ prepend user.dir to it, and return the result"
 		:caught (fn [e]
 				  (if (or (instance? java.lang.InterruptedException e) (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e))))
 					(throw e)
-					(do
-					  (if (instance? Compiler$CompilerException e)
-						(.println *err* (clojure.contrib.stacktrace/root-cause e))
-						(.println *err* e))
+					(binding [*out* *err*]
+					  (do
+						(if (instance? Compiler$CompilerException e)
+						(println (clojure.contrib.stacktrace/root-cause e))
+						(println e)))
 					  (.flush *err*)))))
   (prn)
   (locking repl-opt
