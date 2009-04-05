@@ -1,4 +1,4 @@
-Time-stamp: <2009-04-05 19:11:43 christian>
+Time-stamp: <2009-04-05 19:16:31 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -60,6 +60,7 @@ a simple protocol to address filedescriptors when printing:
   two FDs are supported on the server side: stdout and stederr.
 
 USAGE:
+See the file 'clj-server' in the src/ directory for an example.
 On the server side, you have to start a clojure instance,
 create a server socket via (create-server <port> <backlog>),
 and then go into the accepting loop via (server-loop <server-socket>
