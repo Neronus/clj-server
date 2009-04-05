@@ -4,5 +4,14 @@
 
 (use 'clojure-server.server)
 
+; Create the server socket
 (def *ss* (create-server 9000 10))
+
+;start the server
 (server-loop *ss* 2 5)
+
+;alternatively, you can use an agent, to start the server in a thread of its own
+;; (def *ss-agent* (agent nil))
+;; (send-off *ss-agent* (fn [_] (server-loop *ss* 2 5)))
+
+;; (clojure.main/repl)
