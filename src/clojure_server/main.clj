@@ -16,9 +16,10 @@
   (:use clojure.main clojure.contrib.trace)
   (:require clojure.contrib.stacktrace))
 
-(defn- make-absolute [path]
+(defn- make-absolute
   "If the path is absolute, return it as it is. Otherwise,
 prepend user.dir to it, and return the result"
+  [path]
   (if (= (first path) \/)
 	path
 	(str (System/getProperty "user.dir") \/ path)))

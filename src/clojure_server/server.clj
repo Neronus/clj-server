@@ -28,8 +28,9 @@ otherwise"
 						   (catch Exception e (.close in) (throw)))))]
 		 (this)))
 
-(defn read-to-null [reader]
+(defn read-to-null
   "read to the next null byte from the reader."
+  [reader]
   (loop [result []]
 	(let [c (.read reader)]
 	  (cond
@@ -40,17 +41,24 @@ otherwise"
 		true
 		(recur (conj result (char c)))))))
 
-(defn- read-command-line-parms [reader n]
+(defn- read-command-line-parms
+  "Reads n null-terminated strings from the reader."
+  [reader n]
   (loop [result [], i 0]
 	(if (< i n)
 	  (recur (conj result (str (read-to-null reader))) (+ i 1))
 	  result)))
 
-(defn- set-property! [key value]
+(defn- set-property!
+  "Set the system property"
+  [key value]
   (let [properties (System/getProperties)]
 	(.setProperty properties (str key) (str value))))
 
-(defn- is-relative? [path]
+(defn- is-relative?
+  "Returns false iff the first character of the sequence given as path
+is equals to /"
+  [path]
   (not (= (first path) \/)))
 
 (defn- check-modflags
@@ -64,7 +72,11 @@ Otherwise true is returned"
 	 (bit-and 0077 mode)
 	 0)))
 
-(defn auth [in out]
+(defn auth
+  "Works the authorization procedure using in and out for communication, which
+should be Reader and Writer instannces.
+If authorization was successful, true is returned, false otherwise."
+  [in out]
   (letfn ((dont-accept [] (.write out (int 0)) (.flush out) false)
 		  (accept [] (.write out (int 1)) (.flush out) true)
 		  (check-path [path]
@@ -84,7 +96,10 @@ Otherwise true is returned"
 		 (catch Exception e (dont-accept)))))))
 
 
-(defn- reciever [input output]
+(defn- reciever
+  "Called by the server main loop. This instance calls the authorizatoin procedure
+and, if successful, starts the main repl on the given input and output streams."
+  [input output]
   (when (auth input output)
 	(let [pwd (read-to-null input)
 		  n-args (Integer/parseInt (read-to-null input))
@@ -99,17 +114,21 @@ Otherwise true is returned"
 		;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
 		(apply clojure-server.main/server-main args)))))
 
-(defstruct server :socket :connections)
+(defn create-server
+  "Creates a server socket on the given port with the given backlog, which defaults
+to 10. The returned socket will listen on 127.0.0.1."
+  ([port]
+	 (create-server port 10))
+  ([port backlog]
+	 (let [socket (ServerSocket. port backlog
+								 (InetAddress/getByAddress (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)])))]
+	   socket)))
 
-(defn create-server [port backlog]
-  (let [socket (ServerSocket. port backlog
-							  (InetAddress/getByAddress (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)])))]
-	socket))
 
-
-(defn server-loop [socket minThreads maxThreads]
+(defn server-loop
   "accepts connections on the socket, and launches the repl on incoming
 connections. Doesn't return."
+  [socket minThreads maxThreads]
   (let [exec (ThreadPoolExecutor. minThreads maxThreads 5 TimeUnit/MINUTES
 								  (LinkedBlockingQueue.))]
 	(loop []
