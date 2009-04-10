@@ -11,7 +11,7 @@
   (:use	clojure-server.main clojure.contrib.trace)
   (:import (posix File)
 		   (clojure_server ChunkOutputStream)
-		   (java.io InputStreamReader OutputStreamWriter)
+		   (java.io InputStreamReader PrintWriter)
 		   (java.net ServerSocket InetAddress)
 		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue)))
 
@@ -106,8 +106,8 @@ and, if successful, starts the main repl on the given input and output streams."
 		  args (seq (read-command-line-parms input n-args))]
 	  (binding [*in* (clojure.lang.LineNumberingPushbackReader.
 					  (InputStreamReader. input))
-				*out* (OutputStreamWriter. (ChunkOutputStream. output 1))
-				*err* (OutputStreamWriter. (ChunkOutputStream. output 2))]
+				*out* (PrintWriter. (ChunkOutputStream. output 1))
+				*err* (PrintWriter. (ChunkOutputStream. output 2))]
 		(set-property! "user.dir" pwd)
 		;; This binding is not used, as clojure's core doesn't provide an exit function
 		;; by default
