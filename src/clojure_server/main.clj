@@ -14,7 +14,7 @@
   (:import (clojure.lang
 			Compiler Compiler$CompilerException))
   (:use clojure.main clojure.contrib.trace)
-  (:require clojure.contrib.stacktrace))
+  (:require clojure.stacktrace))
 
 (def *gensym-ns* true)
 
@@ -73,7 +73,7 @@ prepend user.dir to it, and return the result"
 					(binding [*out* *err*]
 					  (do
 						(if (instance? Compiler$CompilerException e)
-						(println (clojure.contrib.stacktrace/root-cause e))
+						(println (clojure.stacktrace/root-cause e))
 						(println e)))
 					  (.flush *err*)))))
   (prn)
@@ -158,8 +158,8 @@ prepend user.dir to it, and return the result"
 				   (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e)))
 				   (instance? InterruptedException e)))
 		 (binding [*out* *err*]
-		   (clojure.contrib.stacktrace/print-stack-trace
-			(clojure.contrib.stacktrace/root-cause e))
+		   (clojure.stacktrace/print-stack-trace
+			(clojure.stacktrace/root-cause e))
 		   (flush))))
 	 (finally (if *gensym-ns* (clojure.lang.Namespace/remove ns-name))))
 	(flush)))
