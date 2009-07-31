@@ -1,4 +1,4 @@
-#!/home/christian/bin/clojure
+#!/usr/bin/env clojure
 
 ; Starts a clojure server listening in port 9000
 
