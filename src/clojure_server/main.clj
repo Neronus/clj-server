@@ -13,7 +13,7 @@
 (ns clojure-server.main
   (:import (clojure.lang
 			Compiler Compiler$CompilerException))
-  (:use clojure.main clojure.contrib.trace)
+  (:use clojure.main)
   (:require clojure.stacktrace))
 
 (def *gensym-ns* true)

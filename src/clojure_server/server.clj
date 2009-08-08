@@ -8,12 +8,11 @@
 
 (ns clojure-server.server
   (:refer-clojure)
-  (:use	clojure-server.main clojure.contrib.trace)
-  (:import (posix File)
-		   (clojure_server ChunkOutputStream)
+  (:import (clojure_server ChunkOutputStream)
 		   (java.io InputStreamReader PrintWriter)
 		   (java.net ServerSocket InetAddress)
-		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue)))
+		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue))
+  (:use clojure-server.main))
 
 (defn- lazy-slurp
   "Read lazyly from anything supporting a .read method (e.g. Streams),
@@ -61,23 +60,12 @@ is equals to /"
   [path]
   (not (= (first path) \/)))
 
-(defn- check-modflags
-  "Returns false iff anyone but the user can do anything with the file.
-Otherwise true is returned"
-  [path]
-  (let [f (File. path)
-		mode (-> f .getStat .mode)]
-	(=
-	 ;; only the lowest 6 bits are interesting, and they shouldn't be set
-	 (bit-and 0077 mode)
-	 0)))
-
 (defn auth
   "Works the authorization procedure using in and out for communication, which
 should be Reader and Writer instannces.
 If authorization was successful, true is returned, false otherwise."
   [in out]
-  (letfn ((dont-accept [] (.write out (int 0)) (.flush out) false)
+  (letfn ((dont-accept [](.write out (int 0)) (.flush out) false)
 		  (accept [] (.write out (int 1)) (.flush out) true)
 		  (check-path [path]
 			(loop [file-seq (lazy-slurp (java.io.FileReader. path)), sock-seq (lazy-slurp in)]
@@ -86,13 +74,11 @@ If authorization was successful, true is returned, false otherwise."
 	  (if (is-relative? path)
 		(dont-accept)
 		(try
-		 (if-not (check-modflags path)
-		   (dont-accept)
-		   (do
-			 (accept)
-			 (if (not (check-path path))
-			   (dont-accept)
-			   (accept))))
+		 (do
+		   (accept)
+		   (if (not (check-path path))
+			 (dont-accept)
+			 (accept)))
 		 (catch Exception e (dont-accept)))))))
 
 
@@ -129,7 +115,7 @@ to 10. The returned socket will listen on 127.0.0.1."
   "accepts connections on the socket, and launches the repl on incoming
 connections. Doesn't return."
   [socket minThreads maxThreads]
-  (let [exec (ThreadPoolExecutor. minThreads maxThreads 5 TimeUnit/MINUTES
+  (let [exec (ThreadPoolExecutor. minThreads maxThreads (* 60 5) TimeUnit/SECONDS
 								  (LinkedBlockingQueue.))]
 	(loop []
 		(let [csocket (.accept socket)
