@@ -1,4 +1,4 @@
 See epl-v10.html contained in the same directory as this file
 
-Exception: Files contained in the posix/ subdirectory, which
-are licensed under the BSD license
+Exception: cpptasks.jar, which is covered under the license contained
+		   in the file cpptasks.LICENSE in the same directory as this file

@@ -1,0 +1,63 @@
+<project name="Clojure server" xmlns:cpptasks="antlib:net.sf.antcontrib.cpptasks">
+  
+  <property name="build" location="build/" />
+  <property name="clojure-server.jar.src" location="src/" />
+  <property name="clojure-server.jar.build" location="${build}/clj-server/" />
+  <property name="dist" location="dist/" />
+  <available property="hasclojure" file="${clojure.jar}"/>
+
+  <target name="init">
+	<mkdir dir="${build}" />
+	<mkdir dir="${clojure-server.jar.build}" />
+	<mkdir dir="${dist}" />
+  </target>
+
+  <target name="clojure-server.jar.copy" depends="init">
+	<copy todir="${clojure-server.jar.build}">
+	  <fileset dir="${clojure-server.jar.src}" includes="**/*.clj" />
+	</copy>
+  </target>
+  
+  <target name="clojure-server.jar.compile" depends="init">
+	<javac srcdir="${clojure-server.jar.src}" destdir="${clojure-server.jar.build}">
+	  <include name="**/*.java"/>
+	</javac>
+  </target>
+
+  <target name="clojure-server.jar.clj-compile" if="hasclojure" depends="init, clojure-server.jar.compile">
+	<java classname="clojure.lang.Compile">
+      <classpath>
+        <path location="${clojure-server.jar.src}"/>
+        <path location="${clojure-server.jar.build}"/>
+        <path location="${clojure.jar}"/>
+      </classpath>
+      <sysproperty key="clojure.compile.path" value="${clojure-server.jar.build}"/>
+	  <arg value="clojure-server.main" />
+	  <arg value="clojure-server.server" />
+	</java>
+  </target>
+
+  <target name="clojure-server.jar" depends="clojure-server.jar.compile, clojure-server.jar.copy, clojure-server.jar.clj-compile">
+	<javac srcdir="${clojure-server.jar.src}" destdir="${clojure-server.jar.build}">
+	  <include name="**/*.java" />
+	</javac>
+
+	<copy todir="${clojure-server.jar.build}">
+	  <fileset dir="${clojure-server.jar.src}" includes="**/*.clj" />
+	</copy>
+
+	<jar jarfile="${dist}/clojure-server.jar" basedir="${clojure-server.jar.build}" />
+  </target>
+
+  <target name="clj-client.dist" depends="init">
+	<cpptasks:cc outtype="executable" outfile="${dist}/clj-client">
+	  <fileset file="src/clj-client.c" />
+	</cpptasks:cc>
+  </target>
+
+  <target name="clj-server.dist" depends="init">
+	<copy file="${clojure-server.jar.src}/clj-server" todir="${dist}" />
+  </target>
+
+  <target name="dist" depends="clojure-server.jar, clj-server.dist, clj-client.dist" />
+</project>
