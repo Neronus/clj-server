@@ -127,9 +127,6 @@ and, if successful, starts the main repl on the given input and output streams."
 				*out* (PrintWriter. (ChunkOutputStream. output 1))
 				*err* (PrintWriter. (ChunkOutputStream. output 2))]
 		(set-property! "user.dir" pwd)
-		;; This binding is not used, as clojure's core doesn't provide an exit function
-		;; by default
-		;;(binding [clojure.core/exit (fn [& args] (.stop (Thread/currentThread)))]
 		(apply clojure-server.main/server-main args)))))
 
 (defn create-server
