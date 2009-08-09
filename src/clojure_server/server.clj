@@ -14,6 +14,8 @@
 		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue))
   (:use clojure-server.main))
 
+(def *security-file*)
+
 (defn- lazy-slurp
   "Read lazyly from anything supporting a .read method (e.g. Streams),
 which return -1 on error, and something coerceable into a character
@@ -40,6 +42,11 @@ otherwise"
 		true
 		(recur (conj result (char c)))))))
 
+(defn write-with-null
+  [writer string]
+  (.write writer string)
+  (.write writer (make-array (Byte/TYPE) 1) 0 1))
+
 (defn- read-command-line-parms
   "Reads n null-terminated strings from the reader."
   [reader n]
@@ -60,6 +67,24 @@ is equals to /"
   [path]
   (not (= (first path) \/)))
 
+(defn- send-int [out int]
+  (.write out (bit-shift-right int 24))
+  (.write out (bit-shift-right int 16))
+  (.write out (bit-shift-right int 8))
+  (.write out int))
+
+(defn- send-string [out string]
+  (let [a (make-array (Byte/TYPE) (* 2 (count string)))]
+	(loop [i 0]
+	  (if (= (count string) i)
+		(do
+		  (.write out a)
+		  (println out))
+		(do
+		  (aset a (* i 2) (byte (bit-shift-right 8 (int (nth string i)))))
+		  (aset a (+ 1 (* i 2)) (byte (int (nth string i))))
+		  (recur (inc i)))))))
+
 (defn auth
   "Works the authorization procedure using in and out for communication, which
 should be Reader and Writer instannces.
@@ -68,18 +93,20 @@ If authorization was successful, true is returned, false otherwise."
   (letfn ((dont-accept [](.write out (int 0)) (.flush out) false)
 		  (accept [] (.write out (int 1)) (.flush out) true)
 		  (check-path [path]
+			(let [locale-array (-> (str path) .getBytes)]
+			  (send-int out (count locale-array))
+			  (.write out locale-array))
 			(loop [file-seq (lazy-slurp (java.io.FileReader. path))
 				   sock-seq (lazy-slurp in)]
 			  (cond (= () file-seq) true,
 					(= (first file-seq) (first sock-seq))
 					  (recur (rest file-seq) (rest sock-seq))
 					true false))))
-	(let [path (read-to-null in)]
+	(let [path *security-file*]
 	  (if (is-relative? path)
 		(dont-accept)
 		(try
 		 (do
-		   (accept)
 		   (if (not (check-path path))
 			 (dont-accept)
 			 (accept)))
@@ -122,7 +149,8 @@ to 10. The returned socket will listen on 127.0.0.1."
 (defn build-security-manager []
   (proxy [SecurityManager] []
 	  (checkExit [status]
-		 (throw (SecurityException. "System/exit caught in server mode. Should be caught by server.")))
+		 (throw (SecurityException.
+				 "System/exit caught in server mode. Should be caight by server.")))
 	  (checkAccept [host port])
 	  (checkAccess [g])
 	  (checkAwtEventQueueAccess [])
@@ -157,7 +185,7 @@ to 10. The returned socket will listen on 127.0.0.1."
 (defn server-loop
   "accepts connections on the socket, and launches the repl on incoming
 connections. Doesn't return."
-  [socket minThreads maxThreads]
+  [socket minThreads maxThreads security-file]
   (let [exec (ThreadPoolExecutor. minThreads maxThreads
 								  (* 60 5) TimeUnit/SECONDS
 								  (LinkedBlockingQueue.))]
@@ -165,7 +193,8 @@ connections. Doesn't return."
 		(let [csocket (.accept socket)
 			  gensym-ns *gensym-ns*]
 		  (.submit exec #^Callable #(with-open [csocket csocket]
-									  (binding [*gensym-ns* gensym-ns]
+									  (binding [*gensym-ns* gensym-ns
+												*security-file* security-file]
 										(reciever (.getInputStream csocket)
 												  (.getOutputStream csocket))))))
 		(recur))))

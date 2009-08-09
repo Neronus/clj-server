@@ -21,6 +21,8 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 
+#include <locale.h>
+
 #define PORT "9000" // the port client will be connecting to
 
 #define MAXDATASIZE 4096
@@ -78,45 +80,41 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 void send_auth_file(int socket) {
-  char *home = getenv("HOME");
-  int home_len, auth_file_path_len;
-  char *path;
+  char *path, *tmp;
   int path_len = 0;
   char answer;
   FILE *f;
   char buf[MAXDATASIZE];
-  int read;
+  ssize_t read;
   int sent;
 
-  home_len = strlen(home);
-  auth_file_path_len = strlen(AUTH_FILE_PATH);
-  path_len = home_len + auth_file_path_len + 1;
-  path = malloc(sizeof(char) * (path_len + 1));
-  strcpy(path, home);
-  path[home_len] = '/';
-  strcpy(path + home_len + 1, AUTH_FILE_PATH);
-  path[path_len] = '\0';
-  
-  send(socket, path, path_len + 1, 0);
-  
-  // The next byte determines, if the server accepted the file
-  read = recv(socket, &answer, 1, 0);
-  if(read != 1) {
-	perror("recv");
-	exit(1);
-  }
-  
-  if(!answer) {
-	fprintf(stderr, "Server did not accept authentication file\n");
+  if (recv_int(socket, &path_len) != 4) {
+	perror("Recieving path length");
 	exit(1);
   }
 
+  path = malloc(sizeof(char) * (path_len + 1));
+  tmp = path;
+  read = 0;
+  while (read != path_len) {
+	read = recv(socket, tmp, path_len - read, 0);
+	if (read < 0) {
+	  perror ("Reading path");
+	  exit (1);
+	}
+	tmp += read;
+
+  }
+  path[path_len] = '\0';
+  
   // Now start sending the file
   f = fopen(path, "r");
   if(f == NULL) {
 	perror("fopen");
 	exit(1);
   }
+
+  free(path);
 
   while(1) {
 	// read some bytes
@@ -219,7 +217,6 @@ void stdout_writer(int socket) {
 	  break;
 	default:
 	  write(fd, buf, numbytes);
-	  //fputs(buf, stdout);
 	  length -= numbytes;
 	}
   }
@@ -242,6 +239,8 @@ int main(int argc, char *argv[])
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
+
+	setlocale (LC_ALL, "");
 
 	port = getenv("CLJ_CLIENT_PORT");
 	if(port == NULL) {

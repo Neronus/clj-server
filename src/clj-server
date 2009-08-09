@@ -10,7 +10,7 @@
 (set-exit-security-manager)
 
 ;start the server
-(server-loop *ss* 2 5)
+(server-loop *ss* 2 5 "/home/christian/.clj-server-authŠ"))
 
 ;alternatively, you can use an agent, to start the server in a thread of its own
 ;; (def *ss-agent* (agent nil))
