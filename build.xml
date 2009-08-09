@@ -40,7 +40,7 @@
   <target name="clojure-server.jar" depends="clojure-server.jar.compile, clojure-server.jar.copy, clojure-server.jar.clj-compile">
 	<javac srcdir="${clojure-server.jar.src}" destdir="${clojure-server.jar.build}">
 	  <include name="**/*.java" />
-	</javac>
+	</javac>      
 
 	<copy todir="${clojure-server.jar.build}">
 	  <fileset dir="${clojure-server.jar.src}" includes="**/*.clj" />
@@ -49,15 +49,19 @@
 	<jar jarfile="${dist}/clojure-server.jar" basedir="${clojure-server.jar.build}" />
   </target>
 
-  <target name="clj-client.dist" depends="init">
-	<cpptasks:cc outtype="executable" outfile="${dist}/clj-client">
+  <target name="clj-client.build" depends="init">
+	<cpptasks:cc outtype="executable" outfile="${build}/clj-client">
 	  <fileset file="src/clj-client.c" />
 	</cpptasks:cc>
+  </target>
+  
+  <target name="clj-client.dist" depends="clj-client.build">
+	<copy file="${build}/clj-client" todir="${dist}" />
   </target>
 
   <target name="clj-server.dist" depends="init">
 	<copy file="${clojure-server.jar.src}/clj-server" todir="${dist}" />
   </target>
 
-  <target name="dist" depends="clojure-server.jar, clj-server.dist, clj-client.dist" />
+  <target name="dist" depends="clojure-server.jar, clj-server.dist, clj-client.dist" /> 
 </project>
