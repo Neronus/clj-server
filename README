@@ -1,4 +1,4 @@
-Time-stamp: <2009-08-09 17:03:33 christian>
+Time-stamp: <2009-08-09 17:22:40 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -80,7 +80,6 @@ NOTES:
 * Using vars (other than that of the temporary namespace) is not a
   good idea, as they are persistend between sessions,
   and possibly are set by another script.
-* The system property user.dir is set to the working directory of the
-  client. If you rely on the current directory anywhere, ask for that
-  property. The REAL current directory of the program executing your
-  code will be that of the server
+* Each starting namespace gets a symbol *current-working-directory*,
+  which contains the absolute path of the current working directory
+  of the client.

@@ -126,8 +126,8 @@ and, if successful, starts the main repl on the given input and output streams."
 					  (InputStreamReader. input))
 				*out* (PrintWriter. (ChunkOutputStream. output 1))
 				*err* (PrintWriter. (ChunkOutputStream. output 2))
-				*exit* (ChunkOutputStream. output -1)]
-		(set-property! "user.dir" pwd)
+				*exit* (ChunkOutputStream. output -1)
+				*pwd* pwd]
 		(apply clojure-server.main/server-main args)))))
 
 (defn create-server

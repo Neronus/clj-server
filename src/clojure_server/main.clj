@@ -22,6 +22,9 @@
 ;; Stream to which the exit status is sent
 (def *exit*)
 
+;; Current working directory
+(def *pwd*)
+
 (defn- make-absolute
   "If the path is absolute, return it as it is. Otherwise,
 prepend user.dir to it, and return the result"
@@ -59,6 +62,7 @@ prepend user.dir to it, and return the result"
   "Common initialize routine for repl, script, and null opts"
   [ns-name args inits]
   (eval `(ns ~ns-name))
+  (intern ns-name '*current-working-directory* *pwd*)
   (in-ns ns-name)
   (set! *command-line-args* args)
   (doseq [[opt arg] inits]
