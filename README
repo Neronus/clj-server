@@ -1,4 +1,4 @@
-Time-stamp: <2009-04-05 19:16:31 christian>
+Time-stamp: <2009-08-09 17:03:33 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -14,7 +14,7 @@ To achieve this, a server is listening for incoming connections on a configurabl
 port. If a client connects, the connection is used to transfer data that normally
 goes through *in* *out* and *err*.
 
-This server is intended for local use only. This means, that you should
+This server is intended for local use only. This means, that the server should
 only listen to 127.0.0.1 or some other loopback address, as the data stream
 is not encrypted. Furthermore, the authentication scheme only works locally.
 
@@ -31,15 +31,14 @@ As the server executes arbitrary code, some kind of authentication has to be
 used. This authentication has to work without user interaction, has to be fast
 and easy to setup, and should require no third party libraries, if possible.
 
-This project uses a file based authentication method: A file, which can only
-be read by the user who started the server is required. The client
-is required to send the filename of the file he wishes to use for authentication,
-the server looks if the file is acceptable (i.e. only readable for the user
-who started the server), accepts the file if it is. The client then starts
-to transmit the contents of the file, and the server compares the recieved
-data with the contents of the file. If the recieved data and the file's contents
-are equal, the connection is accepted, and the command line parameter passing
-is started.
+This project uses a file based authentication method: A file, which
+can only be read by the user who started the server is required. To
+this end, when the communication between client and server begins, the
+server send a filename to the client; the client then sends the
+content of the file to the server, which compares the data sent to the
+data which it reads from the file.  If the recieved data and the
+file's contents are equal, the connection is accepted, and the command
+line parameter passing is started.
 
 * Command line parameter passing:
 First, the current working directory is transmitted, then the number of
@@ -48,8 +47,8 @@ there are any.
 
 * Communication:
 Communication is done via sockets, obviously. The client
-just send its data to the server. The server OTOH uses
-a simple protocol to address filedescriptors when printing:
+just send its data recieved via stdin to the server. The server
+OTOH uses a simple protocol to address filedescriptors when printing:
   Everything that is sent from the server to the client
   is wrapped into a 'chunk' (idea taken from Nailgun).
   This chunk has a header consisting of 2 integers (4 byte each):
@@ -62,16 +61,14 @@ a simple protocol to address filedescriptors when printing:
 USAGE:
 See the file 'clj-server' in the src/ directory for an example.
 On the server side, you have to start a clojure instance,
-create a server socket via (create-server <port> <backlog>),
+create a server socket via (create-server <port> <backlog> <path>),
 and then go into the accepting loop via (server-loop <server-socket>
 <minThreads> <maxThreads>), where minThreads is the number of threads
 you want to have for handling connections, and maxThreads is the maximum
 number for the same job.
 On the client side, you have to use the clj-client binary.
 To configure this binary, there is one environment variable:
-CLJ_CLIENT_PORT the port to connect to.
-The file to use for authentication is looked for in
-$HOME/.clj-server-auth. Other than that, the client should work
+CLJ_CLIENT_PORT the port to connect to. Other than that, the client should work
 just like using clojure.main in all cases.
 Each session gets a unique namespace, exclsuively created for it.
 After the session terminates, the namespace is deleted.
@@ -83,13 +80,6 @@ NOTES:
 * Using vars (other than that of the temporary namespace) is not a
   good idea, as they are persistend between sessions,
   and possibly are set by another script.
-* Using System/exit is an even worse idea, as this kills the server.
-  If you want to end your script, use something like
-    (let [thread (Thread/currentThread)]
-      (locking thread
-        (.interrupt thread)
-        (.wait thread)))
-  This is caught by the server, and your session terminates.
 * The system property user.dir is set to the working directory of the
   client. If you rely on the current directory anywhere, ask for that
   property. The REAL current directory of the program executing your
