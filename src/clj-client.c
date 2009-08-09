@@ -27,8 +27,6 @@
 
 #define MAXDATASIZE 4096
 
-#define AUTH_FILE_PATH ".clj-server-auth"
-
 /*
  * If the socket is done sending data
  */
