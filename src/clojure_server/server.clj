@@ -8,7 +8,7 @@
 
 (ns clojure-server.server
   (:refer-clojure)
-  (:import (clojure_server ChunkOutputStream)
+  (:import (clojure_server ChunkOutputStream ExitException)
 		   (java.io InputStreamReader PrintWriter)
 		   (java.net ServerSocket InetAddress)
 		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue))
@@ -125,7 +125,8 @@ and, if successful, starts the main repl on the given input and output streams."
 	  (binding [*in* (clojure.lang.LineNumberingPushbackReader.
 					  (InputStreamReader. input))
 				*out* (PrintWriter. (ChunkOutputStream. output 1))
-				*err* (PrintWriter. (ChunkOutputStream. output 2))]
+				*err* (PrintWriter. (ChunkOutputStream. output 2))
+				*exit* (ChunkOutputStream. output -1)]
 		(set-property! "user.dir" pwd)
 		(apply clojure-server.main/server-main args)))))
 
@@ -148,8 +149,7 @@ to 10. The returned socket will listen on 127.0.0.1."
 (defn build-security-manager []
   (proxy [SecurityManager] []
 	  (checkExit [status]
-		 (throw (SecurityException.
-				 "System/exit caught in server mode. Should be caight by server.")))
+		 (throw (ExitException. status)))
 	  (checkAccept [host port])
 	  (checkAccess [g])
 	  (checkAwtEventQueueAccess [])

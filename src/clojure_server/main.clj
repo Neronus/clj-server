@@ -1,4 +1,4 @@
-;; Copyright (c) Rich Hickey, Christian von Essen All rights reserved. The use and
+;; Copyright (c) Rich Hickey, Christian von Essen All rights reserved. The use and)
 ;; distribution terms for this software are covered by the Eclipse Public
 ;; License 1.0 (http://opensource.org/licenses/eclipse-1.0.php) which can be found
 ;; in the file epl-v10.html at the root of this distribution. By using this
@@ -12,12 +12,15 @@
 ;; The rest is written by me
 
 (ns clojure-server.main
-  (:import (clojure.lang
-			Compiler Compiler$CompilerException))
+  (:import (clojure.lang Compiler Compiler$CompilerException)
+		   (clojure_server ExitException))
   (:use clojure.main)
   (:require clojure.stacktrace))
 
 (def *gensym-ns* true)
+
+;; Stream to which the exit status is sent
+(def *exit*)
 
 (defn- make-absolute
   "If the path is absolute, return it as it is. Otherwise,
@@ -71,8 +74,8 @@ prepend user.dir to it, and return the result"
 		:caught (fn [e]
 				  (if (or
 					   (and (instance? Compiler$CompilerException e)
-							(instance? SecurityException (.getCause e)))
-					   (instance? SecurityException e))
+							(instance? ExitException (.getCause e)))
+					   (instance? ExitException e))
 					(throw e)
 					(binding [*out* *err*]
 					  (do
@@ -80,11 +83,7 @@ prepend user.dir to it, and return the result"
 						(println (clojure.stacktrace/root-cause e))
 						(println e)))
 					  (.flush *err*)))))
-  (prn)
-  (locking repl-opt
-	(.interrupt (Thread/currentThread))
-	(.wait repl-opt)))
-
+  (prn))
 
 (defn- script-opt
   "Run a script from a file, resource, or standard in with args and inits"
@@ -158,13 +157,21 @@ prepend user.dir to it, and return the result"
 		   ((main-dispatch opt) ns-name args inits)))
 	   (repl-opt ns-name nil nil))
 	 (catch Exception e
-	   (when-not (or
+	   (if-not (or
 				  (and (instance? Compiler$CompilerException e)
-					   (instance? SecurityException (.getCause e)))
-				  (instance? SecurityException e))
+					   (instance? ExitException (.getCause e)))
+				  (instance? ExitException e))
 		 (binding [*out* *err*]
 		   (clojure.stacktrace/print-stack-trace
 			(clojure.stacktrace/root-cause e))
-		   (flush))))
+		   (flush)
+		   (.write *exit* 1)
+		   (.flush *exit*))
+		 (do
+		   (.write *exit*
+			   (if (instance? ExitException e)
+				 (.getStatus e)
+				 (-> e .getCause .getStatus)))
+		   (.flush *exit*))))
 	 (finally (if *gensym-ns* (clojure.lang.Namespace/remove ns-name))))
 	(flush)))

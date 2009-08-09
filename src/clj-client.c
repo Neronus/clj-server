@@ -189,6 +189,7 @@ void stdout_writer(int socket) {
   int length = 0;
   int fd = 0;
   int done = 0;
+  int status = 0; // Used for exit status
 
   numbytes = recv_int(socket, &fd);
   if(numbytes < 0) {
@@ -202,6 +203,18 @@ void stdout_writer(int socket) {
   if(numbytes != 4) {
 	perror("recv");
 	exit(1);
+  }
+
+  if (fd == -1) {
+	if (length > 4) {
+	  fputs("Recieved exit status longer than 4 bytes", stderr);
+	  exit (1);
+	}
+	numbytes = recv(socket, &status, length, MSG_WAITALL);
+	if (numbytes != length) {
+	  perror("Error while recieving exit status");
+	}
+	exit (status);
   }
 
   while(length > 0 && !done) {
@@ -312,6 +325,7 @@ int main(int argc, char *argv[])
 	  select_result = select(sockfd+1, &fdset, NULL, NULL, NULL);
 	  if(select_result < 0) {
 		perror("select");
+		exit(1);
 	  }
 	  
 	  if(FD_ISSET(STDIN_FILENO, &fdset)) {

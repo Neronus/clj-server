@@ -39,7 +39,6 @@ public class ChunkOutputStream extends OutputStream {
 	public void write(byte[] buf, int offset, int len) throws IOException {
 		// OK, first write the destination, then the length, then write
 		// the data itself
-		//byte header[8];
 		synchronized(stream) {
 			for(int i = 3; i >= 0; i--) {
 				stream.write((fd >> (i*8)) & 255);
