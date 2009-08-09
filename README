@@ -1,4 +1,4 @@
-Time-stamp: <2009-08-09 17:22:40 christian>
+Time-stamp: <2009-08-09 17:38:52 christian>
 Christian von Essen <christian@mvonessen.de>
 
 This project aims to provide a client-server architecture for clojure.
@@ -59,13 +59,14 @@ OTOH uses a simple protocol to address filedescriptors when printing:
   two FDs are supported on the server side: stdout and stederr.
 
 USAGE:
-See the file 'clj-server' in the src/ directory for an example.
-On the server side, you have to start a clojure instance,
-create a server socket via (create-server <port> <backlog> <path>),
-and then go into the accepting loop via (server-loop <server-socket>
-<minThreads> <maxThreads>), where minThreads is the number of threads
-you want to have for handling connections, and maxThreads is the maximum
-number for the same job.
+See the file 'clj-server' in the src/ directory for an example.  On
+the server side, you have to start a clojure instance, create a server
+socket via (create-server <port> <backlog> <path>) (path is the path
+of the file used for authorization. should be only readable by the
+user starting the server), and then go into the accepting loop via
+(server-loop <server-socket> <minThreads> <maxThreads>), where
+minThreads is the number of threads you want to have for handling
+connections, and maxThreads is the maximum number for the same job.
 On the client side, you have to use the clj-client binary.
 To configure this binary, there is one environment variable:
 CLJ_CLIENT_PORT the port to connect to. Other than that, the client should work
