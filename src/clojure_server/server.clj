@@ -68,8 +68,12 @@ If authorization was successful, true is returned, false otherwise."
   (letfn ((dont-accept [](.write out (int 0)) (.flush out) false)
 		  (accept [] (.write out (int 1)) (.flush out) true)
 		  (check-path [path]
-			(loop [file-seq (lazy-slurp (java.io.FileReader. path)), sock-seq (lazy-slurp in)]
-			  (cond (= () file-seq) true, (= (first file-seq) (first sock-seq)) (recur (rest file-seq) (rest sock-seq)), true false))))
+			(loop [file-seq (lazy-slurp (java.io.FileReader. path))
+				   sock-seq (lazy-slurp in)]
+			  (cond (= () file-seq) true,
+					(= (first file-seq) (first sock-seq))
+					  (recur (rest file-seq) (rest sock-seq))
+					true false))))
 	(let [path (read-to-null in)]
 	  (if (is-relative? path)
 		(dont-accept)
@@ -80,7 +84,6 @@ If authorization was successful, true is returned, false otherwise."
 			 (dont-accept)
 			 (accept)))
 		 (catch Exception e (dont-accept)))))))
-
 
 (defn- reciever
   "Called by the server main loop. This instance calls the authorizatoin procedure
@@ -110,17 +113,60 @@ to 10. The returned socket will listen on 127.0.0.1."
 								 (InetAddress/getByAddress (into-array (Byte/TYPE) [(byte 127) (byte 0) (byte 0) (byte 1)])))]
 	   socket)))
 
+(defn set-security-manager [manager]
+  (System/setSecurityManager manager))
+
+(defn get-security-manager []
+  (System/getSecurityManager))
+
+(defn build-security-manager []
+  (proxy [SecurityManager] []
+	  (checkExit [status]
+		 (throw (SecurityException. "System/exit caught in server mode. Should be caught by server.")))
+	  (checkAccept [host port])
+	  (checkAccess [g])
+	  (checkAwtEventQueueAccess [])
+	  (checkConnect ([host port])
+					([host port context]))
+	  (checkCreateClassLoader [])
+	  (checkDelete [file])
+	  (checkExec [cmd])
+	  (checkLink [lib])
+	  (checkListen [port])
+	  (checkMemberAccess [clazz which])
+	  (checkMulticast ([maddr])
+					  ([maddr ttl]))
+	  (checkPackageAccess [pkg])
+	  (checkPackageDefinition [pkg])
+	  (checkPermission ([perm])
+					   ([perm context]))
+	  (checkPrintJobAccess [])
+	  (checkPropertiesAccess ([])
+							 ([key]))
+	  (checkRead ([file])
+				 ([file context]))
+	  (checkSecurityAccess [target])
+	  (checkSetFactory [])
+	  (checkSystemClipboardAccess [])
+	  (checkTopLevelWindow [window] true)
+	  (checkWrite ([fd]))))
+
+(defn set-exit-security-manager []
+	 (set-security-manager (build-security-manager)))
 
 (defn server-loop
   "accepts connections on the socket, and launches the repl on incoming
 connections. Doesn't return."
   [socket minThreads maxThreads]
-  (let [exec (ThreadPoolExecutor. minThreads maxThreads (* 60 5) TimeUnit/SECONDS
+  (let [exec (ThreadPoolExecutor. minThreads maxThreads
+								  (* 60 5) TimeUnit/SECONDS
 								  (LinkedBlockingQueue.))]
 	(loop []
 		(let [csocket (.accept socket)
 			  gensym-ns *gensym-ns*]
 		  (.submit exec #^Callable #(with-open [csocket csocket]
 									  (binding [*gensym-ns* gensym-ns]
-										(reciever (.getInputStream csocket) (.getOutputStream csocket))))))
+										(reciever (.getInputStream csocket)
+												  (.getOutputStream csocket))))))
 		(recur))))
+

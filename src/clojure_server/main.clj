@@ -6,9 +6,10 @@
 ;; this license. You must not remove this notice, or any other, from this
 ;; software.
 
-;; Originally contributed by Stephen C. Gilardi
+;; Christian von Essen
 
-;; Modified by Christian von Essen for clojure-server
+;; This code is partly taken in parts from the original clojure.main namespace
+;; The rest is written by me
 
 (ns clojure-server.main
   (:import (clojure.lang
@@ -68,7 +69,10 @@ prepend user.dir to it, and return the result"
     (println "Clojure"))
   (repl :init #(initialize ns-name args inits)
 		:caught (fn [e]
-				  (if (or (instance? java.lang.InterruptedException e) (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e))))
+				  (if (or
+					   (and (instance? Compiler$CompilerException e)
+							(instance? SecurityException (.getCause e)))
+					   (instance? SecurityException e))
 					(throw e)
 					(binding [*out* *err*]
 					  (do
@@ -154,9 +158,10 @@ prepend user.dir to it, and return the result"
 		   ((main-dispatch opt) ns-name args inits)))
 	   (repl-opt ns-name nil nil))
 	 (catch Exception e
-	   (when (not (or
-				   (and (instance? Compiler$CompilerException e) (instance? InterruptedException (.getCause e)))
-				   (instance? InterruptedException e)))
+	   (when-not (or
+				  (and (instance? Compiler$CompilerException e)
+					   (instance? SecurityException (.getCause e)))
+				  (instance? SecurityException e))
 		 (binding [*out* *err*]
 		   (clojure.stacktrace/print-stack-trace
 			(clojure.stacktrace/root-cause e))
