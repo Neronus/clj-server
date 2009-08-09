@@ -9,8 +9,10 @@
 
 (set-exit-security-manager)
 
-;start the server
-(server-loop *ss* 2 5 "/home/christian/.clj-server-authŠ"))
+; start the server, using this file for security.
+; make sure it's only readable by you
+(throw (Exception. "You have to set a security file"))
+;(server-loop *ss* 2 5 "/home/christian/.clj-server-auth"))
 
 ;alternatively, you can use an agent, to start the server in a thread of its own
 ;; (def *ss-agent* (agent nil))
