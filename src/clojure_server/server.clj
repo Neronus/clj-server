@@ -67,7 +67,9 @@ is equals to /"
   [path]
   (not (= (first path) \/)))
 
-(defn- send-int [out int]
+(defn- send-int
+  "Send an 4 byte integer down the stream"
+  [out int]
   (.write out (bit-shift-right int 24))
   (.write out (bit-shift-right int 16))
   (.write out (bit-shift-right int 8))
