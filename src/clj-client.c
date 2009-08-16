@@ -25,7 +25,14 @@
 
 #define PORT "9000" // the port client will be connecting to
 
-#define MAXDATASIZE 4096
+#define MAXDATASIZE 65535
+
+#define MSG_STDOUT 0
+#define MSG_STDERR 1
+#define MSG_EXIT   2
+#define MSG_PATH   3
+#define MSG_OK     4
+#define MSG_ERR    5
 
 /*
  * If the socket is done sending data
@@ -36,35 +43,63 @@ int sock_done = 0;
  */
 int stdin_done = 0;
 
+struct msg {
+  uint8_t type;
+  int32_t length;
+  uint8_t *data;
+};
 
-/*
- * Send one character
- */
-int send_char(int socket, char c) {
-  return send(socket, &c, 1, 0);
+int send_byte(int socket, uint8_t data) {
+  return send(socket, &data, 1, 0);
 }
 
-/*
- * Send one integer, converted to a string
- */
-int send_int(int socket, int i) {
-  char buf[255];
-  int n = sprintf(buf, "%d", i);
-  return send(socket, buf, n+1, 0);
+int recv_byte(int socket, uint8_t *data) {
+  return recv(socket, data, 1, 0);
 }
 
-int recv_int(int socket, int *result) {
-  unsigned char buf[4];
-  int ret, i = 0;
-  while(i < 4) {
-	ret = recv(socket, buf + i, 4 - i, 0);
-	if(ret <= 0) {
-	  return ret;
-	}
-	i += ret;
+int send_int(int socket, int32_t data) {
+  data = htonl(data);
+  return send(socket, &data, 4, 0);
+}
+
+int recv_int(int socket, int32_t *data) {
+  int ret = recv(socket, data, 4, MSG_WAITALL);
+  *data = ntohl(*data);
+  return ret;
+}
+
+void recieve_msg(int socket, struct msg *msg) {
+  if (recv_byte(socket, &msg->type) != 1) {
+	perror("Reading message type: ");
+	exit(1);
   }
-  *result = buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
-  return i;
+
+  if (recv_int(socket, &msg->length) != 4) {
+	perror("Reading message length: ");
+	exit(1);
+  }
+
+  if (msg->length > 0) {
+	msg->data = malloc(msg->length);
+	if (msg->data == NULL) {
+	  perror("Allocating message buffer: ");
+	  exit(1);
+	}
+
+	if (recv(socket, msg->data, msg->length, MSG_WAITALL) != msg->length) {
+	  perror("Recieving message data :");
+	  exit(1);
+	}
+  } else {
+	msg->data = NULL;
+  }
+}
+
+void free_message_data(struct msg *msg) {
+  if (msg->data != NULL) {
+	free(msg->data);
+	msg->data = NULL;
+  }
 }
 
 // get sockaddr, IPv4 or IPv6:
@@ -78,40 +113,35 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 void send_auth_file(int socket) {
-  char *path, *tmp;
-  int path_len = 0;
-  char answer;
+  char *path;
   FILE *f;
   char buf[MAXDATASIZE];
   ssize_t read;
   int sent;
+  struct msg msg;
 
-  if (recv_int(socket, &path_len) != 4) {
-	perror("Recieving path length");
+  // recieve path
+  recieve_msg(socket, &msg);
+
+  if (msg.type != MSG_PATH) {
+	fprintf(stderr, "Expected path message, got message type %d\n", msg.type);
 	exit(1);
   }
-
-  path = malloc(sizeof(char) * (path_len + 1));
-  tmp = path;
-  read = 0;
-  while (read != path_len) {
-	read = recv(socket, tmp, path_len - read, 0);
-	if (read < 0) {
-	  perror ("Reading path");
-	  exit (1);
-	}
-	tmp += read;
-
-  }
-  path[path_len] = '\0';
   
+  path = malloc(msg.length + 1);
+  if (path == NULL) {
+	perror("Error allocating memory for path: ");
+	exit (1);
+  }
+
+  memcpy(path, msg.data, msg.length);
+  path[msg.length] = '\0';
   // Now start sending the file
   f = fopen(path, "r");
   if(f == NULL) {
 	perror("fopen");
 	exit(1);
   }
-
   free(path);
 
   while(1) {
@@ -138,17 +168,22 @@ void send_auth_file(int socket) {
 	}
   }
 
+  free_message_data(&msg);
   // OK, now get the answer
-  read = recv(socket, &answer, 1, 0);
-  if(read != 1) {
-	perror("read");
-	exit(1);
-  }
-  
-  if(!answer) {
+
+  recieve_msg(socket, &msg);
+  switch (msg.type) {
+  case MSG_OK:
+	return;
+  case MSG_ERR:
 	fprintf(stderr, "Server did not accept authentication file\n");
 	exit(1);
+  default:
+	fprintf(stderr, "Expected OK or ERR, got %d\n", msg.type);
+	exit(1);
   }
+
+  fclose(f);
 }
 
 /*
@@ -178,59 +213,38 @@ void stdin_reader(int socket) {
   
 /*
  * Only called, when socket is ready to read.
- * Reads from socket, and write output to stdout.
+ * Reads from socket.
  * When socket is at EOF, set sock_done to 1.
  */
 void stdout_writer(int socket) {
-  char buf[MAXDATASIZE];
-  int numbytes;
-  int length = 0;
-  int fd = 0;
-  int done = 0;
   int status = 0; // Used for exit status
+  struct msg msg;
 
-  numbytes = recv_int(socket, &fd);
-  if(numbytes < 0) {
-	perror("recv");
-	exit(1);
-  } else if (numbytes == 0) {
-	sock_done = 1;
-	return;
-  }
-  numbytes = recv_int(socket, &length);
-  if(numbytes != 4) {
-	perror("recv");
-	exit(1);
-  }
+  recieve_msg(socket, &msg);
 
-  if (fd == -1) {
-	if (length > 4) {
-	  fputs("Recieved exit status longer than 4 bytes", stderr);
+  switch (msg.type) {
+  case MSG_STDOUT:
+	if (write(STDOUT_FILENO, msg.data, msg.length) != msg.length) {
+	  perror ("An error occured while writing to stdout");
 	  exit (1);
 	}
-	numbytes = recv(socket, &status, length, MSG_WAITALL);
-	if (numbytes != length) {
-	  perror("Error while recieving exit status");
+	break;
+  case MSG_STDERR:
+	if (write(STDERR_FILENO, msg.data, msg.length) != msg.length) {
+	  perror ("An error occured while writing to stderr");
+	  exit (1);
 	}
+	break;
+  case MSG_EXIT:
+	status = ntohl((int)*(msg.data));
 	exit (status);
+  default:
+	fprintf(stderr, "Got unexpected message type %d", msg.type);
+	exit (1);
   }
 
-  while(length > 0 && !done) {
-	numbytes = recv(socket, buf, length > MAXDATASIZE? MAXDATASIZE : length, 0);
-	switch(numbytes) {
-	case -1:
-	  perror("recv");
-	  exit(1);
-	case 0:
-	  sock_done = 1;
-	  done = 1;
-	  shutdown(socket, SHUT_RD);
-	  break;
-	default:
-	  write(fd, buf, numbytes);
-	  length -= numbytes;
-	}
-  }
+  free_message_data(&msg);
+
   fflush(NULL);
 }
 
@@ -293,25 +307,21 @@ int main(int argc, char *argv[])
 
 	// attempt auth - if this doesn't work, we'll never return
 	send_auth_file(sockfd);
-	
 
 	// Send PWD
 	cwd = get_current_dir_name();
+	send_int(sockfd, strlen(cwd));
 	send(sockfd, cwd, strlen(cwd), 0);
-	send_char(sockfd, '\0');
+	free(cwd);
 
 	// send argument count
 	send_int(sockfd, argc-1);
 
-	free(cwd);
-
 	// send arguments
 	for(i = 1; i < argc; i++) {
+	  send_int(sockfd, strlen(argv[i]));
 	  send(sockfd, argv[i], strlen(argv[i]), 0);
-	  send_char(sockfd, '\0');
 	}
-
-
 	// Let the communication begin!
 	while(!sock_done) {
 	  FD_ZERO(&fdset);

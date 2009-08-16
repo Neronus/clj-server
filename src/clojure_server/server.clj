@@ -12,48 +12,70 @@
 		   (java.io InputStreamReader PrintWriter)
 		   (java.net ServerSocket InetAddress)
 		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue))
-  (:use clojure-server.main))
+  (:use clojure-server.main
+		clojure.contrib.trace
+		clojure.contrib.duck-streams))
+
+(def MSG-STDOUT 0)
+(def MSG-STDERR 1)
+(def MSG-EXIT 2)
+(def MSG-PATH 3)
+(def MSG-OK 4)
+(def MSG-ERR 5)
 
 (def *security-file*)
 
-(defn- lazy-slurp
-  "Read lazyly from anything supporting a .read method (e.g. Streams),
-which return -1 on error, and something coerceable into a character
-otherwise"
-  [in] (letfn [(this [] (lazy-seq
-						  (try
-						   (let [c (.read in)]
-							 (if (= c -1)
-							   (do (.close in) nil)
-							   (cons (char c) (this))))
-						   (catch Exception e (.close in) (throw)))))]
-		 (this)))
+(defmacro bytearray->int [n array]
+  (let [array-sym (gensym "array")]
+	(letfn [(inner [i]
+				   (let [ai (- n i)]
+					 (if (= 1 i)
+					   `(bit-and (int (aget ~array-sym ~ai)) 255)
+					   `(bit-or
+						 (bit-shift-left (bit-and (int (aget ~array-sym ~ai)) 255) ~(* (- i 1) 8))
+								   ~(inner (dec i))))))]
+	  `(let [~array-sym ~array]
+		 ~(inner n)))))
 
-(defn read-to-null
-  "read to the next null byte from the reader."
-  [reader]
-  (loop [result []]
-	(let [c (.read reader)]
-	  (cond
-		(= c 0)
-		(apply str result)
-		(= c 1)
-		(throw Exception "Wrong argument count: Reader died prematurely.")
-		true
-		(recur (conj result (char c)))))))
+(defn read-byte
+  [in]
+  (.read in))
 
-(defn write-with-null
-  [writer string]
-  (.write writer string)
-  (.write writer (make-array (Byte/TYPE) 1) 0 1))
+(defn read-int
+  [in]
+  (let [buffer (make-array Byte/TYPE 4)]
+	(if (= (.read in buffer) 4)
+	  (bytearray->int 4 buffer)
+	  (throw (Exception. "Error while reading integer.")))))
+		
+(defn read-sized-data
+  "Reads from in first an integer and then the number of bytes specified. Returns
+the data as a byte array."
+  ([in length]
+	 (let [array  (make-array Byte/TYPE length)]
+	   (loop [read 0]
+		 (if (= read length)
+		   array
+		   (let [new (.read in array read (- length read))]
+			 (if (= new -1)
+			   (throw (Exception. "Error while reading from socket"))
+			   (recur (+ new read))))))))
+  ([in]
+	 (let [length (read-int in)]
+	   (read-sized-data in length))))
+
+(defn read-sized-string
+  ([in]
+	 (let [array (read-sized-data in)]
+	   (String. array)))
+  ([in length]
+	 (let [array (read-sized-data in length)]
+	   (String. array))))
 
 (defn- read-command-line-parms
   "Reads n null-terminated strings from the reader."
-  [reader n]
-  (loop [result [], i 0]
-	(if (< i n)
-	  (recur (conj result (str (read-to-null reader))) (+ i 1))
-	  result)))
+  [in n]
+  (doall (for [i (range n)] (read-sized-string in))))
 
 (defn- set-property!
   "Set the system property"
@@ -70,40 +92,40 @@ is equals to /"
 (defn- send-int
   "Send an 4 byte integer down the stream"
   [out int]
+  (println int)
   (.write out (bit-shift-right int 24))
   (.write out (bit-shift-right int 16))
   (.write out (bit-shift-right int 8))
   (.write out int))
 
-(defn- send-string [out string]
-  (let [a (make-array (Byte/TYPE) (* 2 (count string)))]
-	(loop [i 0]
-	  (if (= (count string) i)
-		(do
-		  (.write out a)
-		  (println out))
-		(do
-		  (aset a (* i 2) (byte (bit-shift-right 8 (int (nth string i)))))
-		  (aset a (+ 1 (* i 2)) (byte (int (nth string i))))
-		  (recur (inc i)))))))
+(defn send-message
+  ([out message data]
+	 (let [out (ChunkOutputStream. out message)]
+	   (.write out data)
+	   (.flush out)))
+  ([out message]
+	 (send-message out message (make-array Byte/TYPE 0))))
 
 (defn auth
   "Works the authorization procedure using in and out for communication, which
 should be Reader and Writer instannces.
 If authorization was successful, true is returned, false otherwise."
   [in out]
-  (letfn ((dont-accept [](.write out (int 0)) (.flush out) false)
-		  (accept [] (.write out (int 1)) (.flush out) true)
+  (letfn ((dont-accept [] (send-message out MSG-ERR) (.flush out) false)
+		  (accept [] (send-message out MSG-OK) (.flush out) true)
 		  (check-path [path]
-			(let [locale-array (-> (str path) .getBytes)]
-			  (send-int out (count locale-array))
-			  (.write out locale-array))
-			(loop [file-seq (lazy-slurp (java.io.FileReader. path))
-				   sock-seq (lazy-slurp in)]
-			  (cond (= () file-seq) true,
-					(= (first file-seq) (first sock-seq))
-					  (recur (rest file-seq) (rest sock-seq))
-					true false))))
+			(send-message out MSG-PATH (.getBytes path))
+			(let [content (.getBytes (slurp* path))
+				  recieved-content (read-sized-data in (count content))]
+			  (and (= (count content) (count recieved-content))
+				   (loop [i 0]
+					 (cond
+					   (>= i (count content))
+					   true
+					   (= (aget content i) (aget recieved-content i))
+					   (recur (unchecked-inc i))
+					   :else
+					   false))))))
 	(let [path *security-file*]
 	  (if (is-relative? path)
 		(dont-accept)
@@ -119,14 +141,14 @@ If authorization was successful, true is returned, false otherwise."
 and, if successful, starts the main repl on the given input and output streams."
   [input output]
   (when (auth input output)
-	(let [pwd (read-to-null input)
-		  n-args (Integer/parseInt (read-to-null input))
+	(let [pwd (read-sized-string input)
+		  n-args (read-int input)
 		  args (seq (read-command-line-parms input n-args))]
 	  (binding [*in* (clojure.lang.LineNumberingPushbackReader.
 					  (InputStreamReader. input))
-				*out* (PrintWriter. (ChunkOutputStream. output 1))
-				*err* (PrintWriter. (ChunkOutputStream. output 2))
-				*exit* (ChunkOutputStream. output -1)
+				*out* (PrintWriter. (ChunkOutputStream. output MSG-STDOUT))
+				*err* (PrintWriter. (ChunkOutputStream. output MSG-STDERR))
+				*exit* (ChunkOutputStream. output MSG-EXIT)
 				*pwd* pwd]
 		(apply clojure-server.main/server-main args)))))
 
@@ -192,9 +214,10 @@ connections. Doesn't return."
 		(let [csocket (.accept socket)
 			  gensym-ns *gensym-ns*]
 		  (.submit exec #^Callable #(with-open [csocket csocket]
+		  (with-open [csocket csocket]
 									  (binding [*gensym-ns* gensym-ns
 												*security-file* security-file]
 										(reciever (.getInputStream csocket)
-												  (.getOutputStream csocket))))))
+												  (.getOutputStream csocket)))))))
 		(recur))))
 

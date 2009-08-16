@@ -46,6 +46,7 @@ prepend user.dir to it, and return the result"
       (loop [input (read *in* false eof)]
         (when-not (= input eof)
           (let [value (eval input)]
+			(println "Value: " value)
             (when-not (nil? value)
               (prn value))
             (recur (read *in* false eof))))))))
