@@ -9,11 +9,10 @@
 (ns clojure-server.server
   (:refer-clojure)
   (:import (clojure_server ChunkOutputStream ExitException)
-		   (java.io InputStreamReader PrintWriter)
+		   (java.io InputStreamReader PrintWriter BufferedInputStream BufferedOutputStream)
 		   (java.net ServerSocket InetAddress)
 		   (java.util.concurrent ThreadPoolExecutor TimeUnit LinkedBlockingQueue))
   (:use clojure-server.main
-		clojure.contrib.trace
 		clojure.contrib.duck-streams))
 
 (def MSG-STDOUT 0)
@@ -36,10 +35,6 @@
 								   ~(inner (dec i))))))]
 	  `(let [~array-sym ~array]
 		 ~(inner n)))))
-
-(defn read-byte
-  [in]
-  (.read in))
 
 (defn read-int
   [in]
@@ -118,7 +113,7 @@ If authorization was successful, true is returned, false otherwise."
 			(let [content (.getBytes (slurp* path))
 				  recieved-content (read-sized-data in (count content))]
 			  (and (= (count content) (count recieved-content))
-				   (loop [i 0]
+				   (loop [i (int 0)]
 					 (cond
 					   (>= i (count content))
 					   true
@@ -211,13 +206,13 @@ connections. Doesn't return."
 								  (* 60 5) TimeUnit/SECONDS
 								  (LinkedBlockingQueue.))]
 	(loop []
-		(let [csocket (.accept socket)
-			  gensym-ns *gensym-ns*]
-		  (.submit exec #^Callable #(with-open [csocket csocket]
-		  (with-open [csocket csocket]
+	  (let [csocket (.accept socket)
+			gensym-ns *gensym-ns*]
+		(.submit exec #^Callable #(with-open [csocket csocket]
+									(with-open [csocket csocket]
 									  (binding [*gensym-ns* gensym-ns
 												*security-file* security-file]
-										(reciever (.getInputStream csocket)
-												  (.getOutputStream csocket)))))))
-		(recur))))
+										(reciever (BufferedInputStream. (.getInputStream csocket))
+												  (BufferedOutputStream. (.getOutputStream csocket))))))))
+	  (recur))))
 
